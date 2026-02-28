@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ultimate Anime Fighter - Mobile Fixed</title>
+
+<style>
+body { margin:0; background:black; overflow:hidden; font-family:sans-serif; touch-action:none; }
+canvas { display:block; }
+
+.controls {
+  position:fixed;
+  bottom:10px;
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  padding:0 20px;
+}
+
+.btn {
+  width:75px;
+  height:75px;
+  border-radius:50%;
+  background:#222;
+  color:white;
+  font-size:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 0 15px rgba(255,255,255,0.3);
+  user-select:none;
+}
+
+#characterSelect {
+  position:absolute;
+  width:100%;
+  height:100%;
+  background:black;
+  color:white;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+
+.charBox {
+  padding:20px;
+  margin:15px;
+  border:2px solid white;
+  width:220px;
+  text-align:center;
+}
+</style>
+</head>
+<body>
+
+<div id="characterSelect">
+<h1>Select Your Fighter</h1>
+
+<div class="charBox" data-char="eric" style="border-color:cyan;">⚡ Eric – Fast & Technical</div>
+<div class="charBox" data-char="jairo" style="border-color:red;">🔥 Jairo – Heavy Power</div>
+<div class="charBox" data-char="chris" style="border-color:lime;">🧠 Chris – Balanced Fighter</div>
+<div class="charBox" data-char="greg" style="border-color:orange;">💥 Greg – Energy Specialist</div>
+
+</div>
+
+<canvas id="game"></canvas>
+
+<div class="controls">
+  <div>
+    <div class="btn" id="left">◀</div>
+    <div class="btn" id="right">▶</div>
+  </div>
+  <div>
+    <div class="btn" id="attack">⚡</div>
+    <div class="btn" id="special">🔥</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight * 0.8;
+
+const ground = canvas.height - 150;
+
+let player, enemy;
+let selectedType=null;
+let moveLeft=false, moveRight=false;
+let timer=60;
+let combo=0;
+let gameStarted=false;
+
+function createFighter(x,color){
+  return {
+    x,
+    y:ground,
+    width:80,
+    height:150,
+    health:100,
+    energy:0,
+    damage:5,
+    speed:5,
+    energyGain:5,
+    attacking:false,
+    hitStun:0,
+    color
+  }
+}
+
+document.querySelectorAll(".charBox").forEach(box=>{
+  box.addEventListener("click", ()=>{
+    selectedType = box.dataset.char;
+    document.getElementById("characterSelect").style.display="none";
+    startGame();
+  });
+});
+
+function startGame(){
+
+  const characters = {
+    eric: { color:"#00f0ff", health:90, damage:4, speed:7, energyGain:8 },
+    jairo: { color:"#ff0044", health:130, damage:9, speed:4, energyGain:3 },
+    chris: { color:"#33ff33", health:110, damage:6, speed:5, energyGain:5 },
+    greg: { color:"#ff9900", health:100, damage:5, speed:5, energyGain:10 }
+  };
+
+  const chosen = characters[selectedType];
+
+  player = createFighter(60, chosen.color);
+  enemy = createFighter(canvas.width-140, "#aa0033");
+
+  player.health = chosen.health;
+  player.damage = chosen.damage;
+  player.speed = chosen.speed;
+  player.energyGain = chosen.energyGain;
+
+  gameStarted=true;
+  loop();
+}
+
+function bindButton(id, onPress, onRelease){
+  const btn = document.getElementById(id);
+  btn.addEventListener("touchstart", e=>{ e.preventDefault(); onPress(); });
+  btn.addEventListener("touchend", e=>{ e.preventDefault(); onRelease(); });
+  btn.addEventListener("mousedown", onPress);
+  btn.addEventListener("mouseup", onRelease);
+}
+
+bindButton("left", ()=>moveLeft=true, ()=>moveLeft=false);
+bindButton("right", ()=>moveRight=true, ()=>moveRight=false);
+
+bindButton("attack", ()=>{
+  player.attacking=true;
+  setTimeout(()=>player.attacking=false,180);
+}, ()=>{});
+
+bindButton("special", ()=>{
+  if(player.energy>=60){
+    player.energy=0;
+    enemy.health-=30;
+  }
+}, ()=>{});
+
+setInterval(()=>{
+  if(gameStarted) timer--;
+},1000);
+
+function update(){
+
+  if(moveLeft) player.x-=player.speed;
+  if(moveRight) player.x+=player.speed;
+
+  if(enemy.hitStun<=0){
+    if(enemy.x>player.x+20) enemy.x-=2.5;
+    if(enemy.x<player.x-20) enemy.x+=2.5;
+  }
+
+  if(Math.abs(enemy.x-player.x)<90 && enemy.hitStun<=0){
+    if(Math.random()<0.03){
+      player.health-=6;
+      player.hitStun=10;
+      combo=0;
+    }
+  }
+
+  if(player.attacking && Math.abs(player.x-enemy.x)<90){
+    if(enemy.hitStun<=0){
+      enemy.health-=player.damage;
+      enemy.hitStun=10;
+      player.energy+=player.energyGain;
+      combo++;
+    }
+  }
+
+  if(player.hitStun>0) player.hitStun--;
+  if(enemy.hitStun>0) enemy.hitStun--;
+}
+
+function drawFighter(f){
+  ctx.save();
+  ctx.shadowBlur=20;
+  ctx.shadowColor=f.color;
+  ctx.fillStyle=f.color;
+  ctx.fillRect(f.x,f.y,f.width,f.height);
+  ctx.restore();
+
+  if(f.hitStun>0){
+    ctx.fillStyle="white";
+    ctx.fillRect(f.x,f.y,f.width,f.height);
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  drawFighter(player);
+  drawFighter(enemy);
+
+  ctx.fillStyle="lime";
+  ctx.fillRect(20,20,player.health*2,20);
+  ctx.fillRect(canvas.width-220,20,enemy.health*2,20);
+
+  ctx.fillStyle="cyan";
+  ctx.fillRect(20,50,player.energy*2,15);
+
+  ctx.fillStyle="white";
+  ctx.font="20px Arial";
+  ctx.fillText("Combo: "+combo,20,90);
+
+  ctx.font="28px Arial";
+  ctx.fillText(timer,canvas.width/2-10,40);
+
+  if(player.health<=0 || enemy.health<=0 || timer<=0){
+    ctx.font="60px Arial";
+    ctx.fillText("K.O.",canvas.width/2-70,canvas.height/2);
+  }
+}
+
+function loop(){
+  if(!gameStarted) return;
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+</script>
+
+</body>
+</html>
