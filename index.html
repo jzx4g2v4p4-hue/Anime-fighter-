@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PIXEL FIGHTER ULTRA TURBO</title>
+
+<style>
+html, body {
+  margin:0;
+  padding:0;
+  background:black;
+  overflow:hidden;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+canvas {
+  image-rendering: pixelated;
+  background:#111;
+}
+
+.controls {
+  position:fixed;
+  bottom:10px;
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  padding:0 20px;
+}
+
+.btn {
+  width:52px;
+  height:52px;
+  border-radius:50%;
+  background:#222;
+  color:white;
+  font-size:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 0 8px rgba(255,255,255,0.4);
+}
+
+#rotateWarning {
+  position:fixed;
+  inset:0;
+  background:black;
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:monospace;
+  font-size:20px;
+  text-align:center;
+  z-index:100;
+}
+</style>
+</head>
+<body>
+
+<div id="rotateWarning">ROTATE DEVICE<br>LANDSCAPE REQUIRED</div>
+
+<canvas id="game"></canvas>
+
+<div class="controls">
+  <div>
+    <div class="btn" id="left">◀</div>
+    <div class="btn" id="right">▶</div>
+    <div class="btn" id="jump">⬆</div>
+  </div>
+  <div>
+    <div class="btn" id="punch">👊</div>
+    <div class="btn" id="kick">🦵</div>
+    <div class="btn" id="fire">🔥</div>
+    <div class="btn" id="super">💥</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const BASE_W = 384;
+const BASE_H = 224;
+
+canvas.width = BASE_W;
+canvas.height = BASE_H;
+
+function resizeCanvas(){
+  const aspect = BASE_W / BASE_H;
+  let w = window.innerWidth;
+  let h = window.innerHeight;
+
+  if(w/h > aspect){
+    w = h * aspect;
+  } else {
+    h = w / aspect;
+  }
+
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+}
+
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+function checkOrientation(){
+  const warn = document.getElementById("rotateWarning");
+  if(window.innerWidth < window.innerHeight){
+    warn.style.display="flex";
+  } else {
+    warn.style.display="none";
+  }
+}
+
+window.addEventListener("resize", checkOrientation);
+checkOrientation();
+
+ctx.imageSmoothingEnabled = false;
+
+const gravity = 0.5;
+const ground = 170;
+
+let gameState = "intro";
+let introTimer = 120;
+let freeze = 0;
+
+function fighter(x,color){
+  return {
+    x:x,
+    y:ground,
+    vy:0,
+    facing:1,
+    color:color,
+    health:100,
+    meter:0,
+    combo:0,
+    state:"idle",
+    wins:0
+  };
+}
+
+let p = fighter(60,"#00d8ff");
+let e = fighter(240,"#ff3c3c");
+
+let fireballs=[];
+let sparks=[];
+
+let moveL=false, moveR=false;
+
+function bind(id,press,release){
+  const b=document.getElementById(id);
+  b.addEventListener("touchstart",ev=>{ev.preventDefault();press();});
+  b.addEventListener("touchend",ev=>{ev.preventDefault();release();});
+  b.addEventListener("mousedown",press);
+  b.addEventListener("mouseup",release);
+}
+
+bind("left",()=>{moveL=true;p.facing=-1;},()=>moveL=false);
+bind("right",()=>{moveR=true;p.facing=1;},()=>moveR=false);
+bind("jump",()=>{if(p.y===ground)p.vy=-9;},()=>{});
+bind("punch",()=>{p.state="punch";},()=>{});
+bind("kick",()=>{p.state="kick";},()=>{});
+bind("fire",()=>{
+  fireballs.push({x:p.x,y:p.y-10,v:4*p.facing,owner:"p"});
+},()=>{});
+bind("super",()=>{
+  if(p.meter>=100){
+    fireballs.push({x:p.x,y:p.y-15,v:7*p.facing,owner:"p",super:true});
+    p.meter=0;
+  }
+},()=>{});
+
+function resetRound(){
+  p.health=100;
+  e.health=100;
+  p.x=60;
+  e.x=240;
+  p.combo=0;
+  p.state="idle";
+  introTimer=120;
+  gameState="intro";
+}
+
+function update(){
+
+  if(gameState==="intro"){
+    introTimer--;
+    if(introTimer<=0) gameState="fight";
+    return;
+  }
+
+  if(gameState!=="fight") return;
+  if(freeze>0){freeze--;return;}
+
+  if(moveL)p.x-=2;
+  if(moveR)p.x+=2;
+
+  p.vy+=gravity;
+  p.y+=p.vy;
+  if(p.y>ground){p.y=ground;p.vy=0;}
+
+  e.facing = p.x<e.x?-1:1;
+  if(Math.abs(p.x-e.x)>50){
+    e.x += p.x<e.x?-1:1;
+  }
+
+  fireballs.forEach(f=>{
+    f.x+=f.v;
+    if(Math.abs(f.x-e.x)<10 && f.owner==="p"){
+      let dmg=f.super?20:10;
+      e.health-=dmg;
+      p.combo++;
+      p.meter+=10;
+      sparks.push({x:e.x,y:e.y-10,life:10});
+      freeze=5;
+    }
+  });
+
+  fireballs=fireballs.filter(f=>f.x>0 && f.x<BASE_W);
+
+  if(Math.abs(p.x-e.x)<20){
+    if(p.state==="punch"){
+      e.health-=4;
+      p.combo++;
+      p.meter+=5;
+      sparks.push({x:e.x,y:e.y-10,life:8});
+      freeze=4;
+    }
+    if(p.state==="kick"){
+      e.health-=6;
+      p.combo++;
+      p.meter+=8;
+      sparks.push({x:e.x,y:e.y-10,life:10});
+      freeze=6;
+    }
+  }
+
+  if(e.health<=0){
+    p.wins++;
+    if(p.wins===2){
+      gameState="gameover";
+    } else resetRound();
+  }
+
+  sparks.forEach(s=>s.life--);
+  sparks=sparks.filter(s=>s.life>0);
+
+  p.state="idle";
+}
+
+function drawFighter(f){
+  ctx.save();
+  ctx.translate(f.x,f.y);
+  ctx.scale(f.facing,1);
+  ctx.fillStyle=f.color;
+
+  let bob=Math.sin(Date.now()/200)*1;
+
+  ctx.fillRect(-4,-16+bob,8,16);
+  ctx.fillRect(-3,-22+bob,6,6);
+  ctx.fillRect(-4,0,3,8);
+  ctx.fillRect(1,0,3,8);
+
+  ctx.restore();
+}
+
+function draw(){
+
+  ctx.clearRect(0,0,BASE_W,BASE_H);
+
+  ctx.fillStyle="#1e1e1e";
+  ctx.fillRect(0,ground+8,BASE_W,40);
+
+  drawFighter(p);
+  drawFighter(e);
+
+  ctx.fillStyle="orange";
+  fireballs.forEach(f=>{
+    ctx.fillRect(f.x,f.y-5,f.super?10:6,f.super?10:6);
+  });
+
+  ctx.fillStyle="yellow";
+  sparks.forEach(s=>{
+    ctx.fillRect(s.x,s.y,6,6);
+  });
+
+  ctx.fillStyle="lime";
+  ctx.fillRect(10,10,p.health,6);
+  ctx.fillRect(200,10,e.health,6);
+
+  ctx.fillStyle="cyan";
+  ctx.fillRect(10,18,p.meter,4);
+
+  ctx.fillStyle="white";
+  ctx.font="8px monospace";
+  ctx.fillText("WINS: "+p.wins,10,30);
+  ctx.fillText("COMBO: "+p.combo,10,40);
+
+  if(gameState==="intro"){
+    ctx.font="18px monospace";
+    ctx.fillText("ROUND "+(p.wins+1),140,100);
+  }
+
+  if(gameState==="gameover"){
+    ctx.font="18px monospace";
+    ctx.fillText("CHAMPION",120,100);
+  }
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
