@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Urban Fury v6 - Real Sprite Sheet</title>
+<style>
+body {
+    margin:0;
+    background:#111;
+    overflow:hidden;
+}
+
+#game {
+    position:relative;
+    width:100vw;
+    height:100vh;
+}
+
+.fighter {
+    position:absolute;
+    bottom:150px;
+    width:64px;
+    height:64px;
+    background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAABACAYAAAD1Xam+AAABJUlEQVR4nO3cwU3EMBBA0TXaoigILhTEXigIqgodEAlvYtj/XgEez+UrUqJcLgAAAAAAAADAoxhHD9i2bZs9Y4xx+D2PYn/7z55x5P5PRx0M/H0CAGECAGECAGECAGECAGECAGHX6RPu8J5zesbK98SfJ+y/N+N54f7vJ+y/N+Nt4f4vJ+y/N+Pj9/t7AoAwAYAwAYAwAYAwAYAwAYAwAYAwAYCw+Q+BdvzbPzncyfhafYO1xm31DdYar6tv8DNPABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmABAmAAAAAAAAAADwOL4BIpAo6PFk6fAAAAAASUVORK5CYII=");
+    background-repeat:no-repeat;
+    image-rendering:pixelated;
+}
+
+#player { left:100px; }
+#enemy { right:100px; transform:scaleX(-1); }
+
+@keyframes idle {
+    from { background-position:0 0; }
+    to { background-position:-256px 0; }
+}
+
+.animate {
+    animation:idle 0.8s steps(4) infinite;
+}
+
+#controls {
+    position:absolute;
+    bottom:0;
+    width:100%;
+    height:120px;
+    background:#000a;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:20px;
+}
+
+button {
+    width:70px;
+    height:70px;
+    border-radius:50%;
+    border:none;
+    font-size:18px;
+}
+</style>
+</head>
+<body>
+<div id="game">
+    <div id="player" class="fighter animate"></div>
+    <div id="enemy" class="fighter animate"></div>
+
+    <div id="controls">
+        <button onclick="move(-1)">◀</button>
+        <button onclick="move(1)">▶</button>
+    </div>
+</div>
+
+<script>
+let playerX = 100;
+let enemyX = window.innerWidth - 160;
+const player = document.getElementById("player");
+const enemy = document.getElementById("enemy");
+
+function render(){
+    player.style.left = playerX + "px";
+    enemy.style.left = enemyX + "px";
+}
+
+function move(d){
+    playerX += d*20;
+    playerX = Math.max(0, Math.min(window.innerWidth-64, playerX));
+    render();
+}
+
+setInterval(()=>{
+    if(Math.abs(playerX-enemyX)>100){
+        enemyX += playerX>enemyX?6:-6;
+        render();
+    }
+},400);
+
+render();
+</script>
+</body>
+</html>
